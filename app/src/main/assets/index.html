@@ -1,0 +1,589 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>myTram</title>
+<style>
+:root{
+  --bg:#0E1117;--card:#181C25;--sub:#232936;--tabOn:#363E51;--text:#F1F3F7;--muted:#A3AAB8;--border:#2A3040;--link:#8FB0FF;--line:#3060E0;
+  --lateBg:#3A2A0A;--lateText:#FCD34D;--okBg:#0F2E1C;--okText:#86EFAC;--earlyBg:#1E2B4D;--earlyText:#BFD0FF;
+  --warnBg:#2A2110;--warnBorder:#6B4E12;--warnText:#FDE68A;--okCardBg:#0F241A;--okCardBorder:#1E4D33;
+  --redBg:#3A1214;--redBorder:#7F1D1D;--redText:#FCA5A5;--rainBg:#1E2B4D;--rainText:#BFD0FF;--dryBg:#232936;--dryText:#D5DAE3;
+}
+body.light{
+  --bg:#F2F4F7;--card:#FFFFFF;--sub:#E3E7EE;--tabOn:#FFFFFF;--text:#12151C;--muted:#5B6170;--border:#E3E7EE;--link:#1E46B8;--line:#1E46B8;
+  --lateBg:#FEF3C7;--lateText:#92400E;--okBg:#DCFCE7;--okText:#166534;--earlyBg:#DBE5FF;--earlyText:#14327F;
+  --warnBg:#FEF3C7;--warnBorder:#FCD34D;--warnText:#78350F;--okCardBg:#F0FDF4;--okCardBorder:#BBF7D0;
+  --redBg:#FEE2E2;--redBorder:#FCA5A5;--redText:#991B1B;--rainBg:#DBE5FF;--rainText:#14327F;--dryBg:#ECEFF3;--dryText:#3F4553;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,Roboto,system-ui,sans-serif}
+button,input{font-family:inherit}
+.wrap{max-width:520px;margin:0 auto;padding:14px 16px 32px;display:flex;flex-direction:column;gap:12px}
+.card{background:var(--card);border-radius:20px;padding:16px;display:flex;flex-direction:column;gap:10px}
+.cap{font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.6px}
+.muted{color:var(--muted)}
+.row{display:flex;align-items:center;gap:10px}
+.between{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.iconbtn{width:44px;height:44px;border-radius:22px;border:1px solid var(--border);background:var(--card);display:flex;align-items:center;justify-content:center;padding:0;color:var(--text)}
+.pill{height:44px;padding:0 12px;border-radius:22px;border:1px solid var(--border);background:var(--card);color:var(--text);font-size:14px;font-weight:700;display:flex;align-items:center;gap:6px}
+.pill.spin svg{animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.clock{font-size:54px;font-weight:800;letter-spacing:-2px;line-height:1.05;font-variant-numeric:tabular-nums}
+.tabs{display:flex;gap:4px;padding:4px;background:var(--sub);border-radius:14px}
+.tabs button{flex:1;height:44px;border-radius:10px;border:none;font-size:15px;font-weight:700;background:transparent;color:var(--muted)}
+.tabs button.on{background:var(--tabOn);color:var(--text);box-shadow:0 1px 3px rgba(0,0,0,.18)}
+.badge{font-size:12px;font-weight:700;padding:3px 8px;border-radius:6px;white-space:nowrap}
+.b-late{background:var(--lateBg);color:var(--lateText)}.b-ok{background:var(--okBg);color:var(--okText)}
+.b-early{background:var(--earlyBg);color:var(--earlyText)}.b-plan{background:var(--sub);color:var(--muted)}
+.dep{display:flex;align-items:center;gap:12px;padding:10px 0;border-top:1px solid var(--border)}
+.lineno{width:46px;height:46px;border-radius:12px;background:var(--line);color:#fff;font-size:21px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.mins{font-size:20px;font-weight:800;letter-spacing:-.4px}
+.small{font-size:12px}
+.where{font-size:12px;font-weight:600;color:var(--link);display:flex;align-items:center;gap:4px}
+.arr{display:flex;flex-direction:column;align-items:flex-end;gap:1px;flex-shrink:0}
+.arr .l{font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px}
+.arr .t{font-size:20px;font-weight:800}
+.box{border-radius:20px;padding:14px 16px;display:flex;gap:12px;align-items:center;border:1px solid}
+.box.ok{background:var(--okCardBg);border-color:var(--okCardBorder)}
+.box.warn{background:var(--warnBg);border-color:var(--warnBorder)}
+.box.red{background:var(--redBg);border-color:var(--redBorder)}
+.box.ok .h{color:var(--okText)}.box.warn .h,.box.warn .t{color:var(--warnText)}.box.red .h{color:var(--redText)}
+.h{font-size:15px;font-weight:700}
+.track{position:relative;display:grid;grid-template-columns:repeat(5,minmax(0,1fr))}
+.track .rail{position:absolute;left:10%;right:10%;top:49px;height:4px;border-radius:2px;background:var(--sub)}
+.tcol{display:flex;flex-direction:column;align-items:center;gap:6px;position:relative}
+.tcol .trams{height:36px;display:flex;gap:3px;align-items:flex-end;flex-wrap:wrap;justify-content:center}
+.tcol .tr{min-width:26px;height:26px;padding:0 4px;border-radius:7px;background:var(--line);color:#fff;font-size:13px;font-weight:800;display:flex;align-items:center;justify-content:center}
+.dot{width:12px;height:12px;margin:3px 0;border-radius:6px;background:var(--card);border:3px solid var(--muted);position:relative}
+.dot.me{width:18px;height:18px;margin:0;border-radius:9px;background:var(--okText);border:3px solid var(--card);box-shadow:0 0 0 2px var(--okText)}
+.tlabel{font-size:11px;text-align:center;color:var(--muted);line-height:1.2;word-break:break-word}
+.tlabel.me{font-weight:800;color:var(--text)}
+.status{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)}
+.live{width:8px;height:8px;border-radius:4px;background:#22C55E;flex-shrink:0}
+.live.off{background:#9CA3AF}
+.err{color:var(--redText);font-size:13px}
+.ptr{height:0;overflow:hidden;display:flex;align-items:flex-end;justify-content:center;font-size:13px;color:var(--muted);transition:height .2s}
+/* ustawienia */
+#settings{position:fixed;inset:0;background:var(--bg);overflow-y:auto;display:none;z-index:5}
+#settings.open{display:block}
+label{font-size:13px;color:var(--muted)}
+.field{display:flex;align-items:center;gap:10px;background:var(--sub);border:1px solid var(--border);border-radius:12px;padding:0 12px;height:48px}
+.field input{flex:1;background:transparent;border:none;color:var(--text);font-size:16px;font-weight:600;outline:none;min-width:0}
+.sugg{background:var(--sub);border:1px solid var(--border);border-radius:12px;overflow:hidden;display:flex;flex-direction:column}
+.sugg button{text-align:left;padding:12px 14px;background:transparent;border:none;border-top:1px solid var(--border);color:var(--text);font-size:15px;font-weight:600}
+.sugg button:first-child{border-top:none}
+.sugg span{font-weight:400;color:var(--muted);font-size:13px}
+.chips{display:flex;gap:8px;flex-wrap:wrap}
+.chip{height:44px;min-width:52px;padding:0 12px;border-radius:12px;font-size:16px;font-weight:800;background:transparent;color:var(--muted);border:1px dashed var(--border)}
+.chip.on{background:var(--line);color:#fff;border:1px solid var(--line)}
+.switchrow{display:flex;justify-content:space-between;align-items:center;min-height:48px;gap:12px}
+.switch{width:52px;height:30px;border-radius:15px;background:var(--sub);border:1px solid var(--border);position:relative;flex-shrink:0;padding:0}
+.switch::after{content:"";position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:11px;background:#fff;transition:left .15s}
+.switch.on{background:var(--line);border-color:var(--line)}
+.switch.on::after{left:25px}
+.primary{height:52px;border-radius:14px;background:var(--line);color:#fff;font-size:16px;font-weight:700;border:none;width:100%}
+.secondary{height:44px;border-radius:12px;background:var(--sub);color:var(--text);font-size:14px;font-weight:600;border:1px solid var(--border);padding:0 14px}
+input[type=date]{color-scheme:dark}
+body.light input[type=date]{color-scheme:light}
+.loading{display:flex;flex-direction:column;align-items:center;gap:10px;padding:24px 0;color:var(--muted);font-size:14px;text-align:center}
+</style>
+</head>
+<body>
+<div class="ptr" id="ptr">Puść, aby odświeżyć</div>
+<div class="wrap" id="main">
+  <div class="between" style="align-items:flex-end">
+    <div style="display:flex;flex-direction:column">
+      <div class="cap" style="letter-spacing:.3px;text-transform:none;font-size:14px;font-weight:800;color:var(--okText)">myTram</div>
+      <div class="clock" id="clock" aria-label="Aktualna godzina">--:--</div>
+      <div class="muted" style="font-size:13px" id="date"></div>
+    </div>
+    <div class="row" style="gap:8px">
+      <button class="pill" id="btnRefresh" aria-label="Odśwież dane"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><polyline points="21 3 21 9 15 9"/></svg>Odśwież</button>
+      <button class="iconbtn" id="btnTheme" aria-label="Przełącz tryb ciemny"></button>
+      <button class="iconbtn" id="btnSettings" aria-label="Ustawienia"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <button id="tabWork">Do pracy</button>
+    <button id="tabHome">Do domu</button>
+  </div>
+
+  <section class="card" id="weather"><div class="cap">Pogoda · Łódź</div><div class="muted small">Ładowanie…</div></section>
+
+  <section id="ticket"></section>
+
+  <section class="card" id="depsCard">
+    <div class="between" style="align-items:flex-end">
+      <div style="display:flex;flex-direction:column;gap:2px;min-width:0">
+        <span class="cap">Najbliższe tramwaje</span>
+        <span style="font-size:15px;font-weight:600" id="route"></span>
+      </div>
+      <button id="btnChange" style="background:none;border:none;color:var(--link);font-size:13px;font-weight:600;padding:10px 0">Zmień</button>
+    </div>
+    <div id="deps"><div class="loading">Ładowanie…</div></div>
+    <div class="status" id="status"></div>
+  </section>
+
+  <section class="card" id="trackCard" style="display:none">
+    <span class="cap">Gdzie są tramwaje</span>
+    <div class="track" id="track"></div>
+    <span class="muted small">Kierunek jazdy → · pozycje z GPS tramwajów (dane miejskie)</span>
+  </section>
+
+  <section id="alerts"></section>
+</div>
+
+<!-- USTAWIENIA -->
+<div id="settings">
+  <div class="wrap">
+    <div class="row" style="gap:12px">
+      <button class="iconbtn" id="btnBack" aria-label="Wróć"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg></button>
+      <h1 style="margin:0;font-size:24px;font-weight:800">Ustawienia</h1>
+    </div>
+
+    <section class="card">
+      <span class="cap">Trasa</span>
+      <label for="inFrom">Przystanek domowy</label>
+      <div class="field"><input id="inFrom" autocomplete="off" placeholder="np. Blok 270"></div>
+      <div class="sugg" id="suggFrom" style="display:none"></div>
+      <button class="secondary" id="btnSwap" style="align-self:center">⇅ Zamień</button>
+      <label for="inTo">Przystanek docelowy (praca)</label>
+      <div class="field"><input id="inTo" autocomplete="off" placeholder="np. Piotrkowska Centrum"></div>
+      <div class="sugg" id="suggTo" style="display:none"></div>
+      <span class="muted small">Wpisz kilka liter i wybierz przystanek z listy.</span>
+    </section>
+
+    <section class="card">
+      <span class="cap">Moje linie</span>
+      <div class="chips" id="chips"></div>
+      <span class="muted small">Odjazdy i utrudnienia pokazywane tylko dla zaznaczonych linii.</span>
+    </section>
+
+    <section class="card">
+      <span class="cap">Migawka</span>
+      <label for="inStart">Pierwszy dzień ważności</label>
+      <div class="field"><input id="inStart" type="date"></div>
+      <span class="muted" style="font-size:13px">Rodzaj migawki</span>
+      <div class="tabs"><button id="d30">30 dni</button><button id="d90">90 dni</button></div>
+      <div class="box ok" style="justify-content:space-between"><span class="muted" style="font-size:14px">Ważna do</span><span class="h" id="endText" style="font-size:18px;font-weight:800">—</span></div>
+      <div class="switchrow"><span>Przypomnij 3 dni przed końcem</span><button class="switch" id="swRemind" aria-label="Przypomnienie"></button></div>
+    </section>
+
+    <section class="card">
+      <span class="cap">Wygląd i kierunek</span>
+      <div class="switchrow"><span>Tryb ciemny</span><button class="switch" id="swDark" aria-label="Tryb ciemny"></button></div>
+      <div class="switchrow" style="border-top:1px solid var(--border)"><span>Po 14:00 pokazuj „Do domu”</span><button class="switch" id="swAuto" aria-label="Automatyczny kierunek"></button></div>
+    </section>
+
+    <section class="card">
+      <span class="cap">Rozkład jazdy</span>
+      <span class="muted small" id="gtfsInfo">—</span>
+      <button class="secondary" id="btnGtfs">Pobierz rozkład MPK od nowa</button>
+    </section>
+
+    <button class="primary" id="btnSave">Zapisz</button>
+    <span class="muted small" style="text-align:center">Dane: Otwarte dane Łódź (MPK), pogoda: Open-Meteo</span>
+  </div>
+</div>
+
+<script>
+'use strict';
+// ------------------------------------------------------------ most do Androida
+let __id = 0; const __p = {};
+window.__res = (id, ok, t) => { const p = __p[id]; delete __p[id]; if (!p) return; ok ? p.res(t) : p.rej(new Error(t)); };
+function nat(method, arg) {
+  return new Promise((res, rej) => {
+    if (!window.Android) { MOCK(method, arg).then(res, rej); return; }
+    const id = 'r' + (++__id);
+    __p[id] = { res, rej };
+    Android.call(id, method, arg == null ? '' : String(arg));
+  });
+}
+const $ = id => document.getElementById(id);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+// ------------------------------------------------------------ ustawienia
+const DEF = { from: 'Blok 270', to: 'Piotrkowska Centrum', lines: ['10', '12', '18'], dark: true, autoHome: true, ticketStart: '', ticketDays: 30, remind: true };
+let S = Object.assign({}, DEF);
+try { S = Object.assign({}, DEF, JSON.parse(localStorage.getItem('mytram') || '{}')); } catch (e) {}
+function save() { try { localStorage.setItem('mytram', JSON.stringify(S)); } catch (e) {} }
+
+let dir = (S.autoHome && new Date().getHours() >= 14) ? 'home' : 'work';
+let manualDir = false;
+let last = null;          // ostatnia odpowiedź dashboard
+let loading = false;
+let timer = null;
+
+function applyTheme() {
+  document.body.classList.toggle('light', !S.dark);
+  $('btnTheme').innerHTML = S.dark
+    ? '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>'
+    : '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>';
+  if (window.Android && Android.ustawMotyw) Android.ustawMotyw(!!S.dark);
+}
+
+// ------------------------------------------------------------ zegar
+const DNI = ['niedziela', 'poniedziałek', 'wtorek', 'środa', 'czwartek', 'piątek', 'sobota'];
+const MIES = ['stycznia', 'lutego', 'marca', 'kwietnia', 'maja', 'czerwca', 'lipca', 'sierpnia', 'września', 'października', 'listopada', 'grudnia'];
+const pad = n => (n < 10 ? '0' : '') + n;
+const hm = d => pad(d.getHours()) + ':' + pad(d.getMinutes());
+function tick() {
+  const d = new Date();
+  $('clock').textContent = hm(d);
+  $('date').textContent = DNI[d.getDay()] + ', ' + d.getDate() + ' ' + MIES[d.getMonth()];
+  if (last) renderDeps(); // „za X min” na bieżąco
+}
+
+// ------------------------------------------------------------ kierunek
+function route() { return dir === 'work' ? { from: S.from, to: S.to } : { from: S.to, to: S.from }; }
+function renderTabs() {
+  $('tabWork').classList.toggle('on', dir === 'work');
+  $('tabHome').classList.toggle('on', dir === 'home');
+  const r = route();
+  $('route').innerHTML = esc(r.from) + ' <span class="muted">→</span> ' + esc(r.to);
+}
+
+// ------------------------------------------------------------ pogoda
+const KIER = ['płn.', 'płn.-wsch.', 'wsch.', 'płd.-wsch.', 'płd.', 'płd.-zach.', 'zach.', 'płn.-zach.'];
+function wdesc(c) {
+  if (c === 0) return 'Bezchmurnie'; if (c === 1) return 'Przeważnie słonecznie'; if (c === 2) return 'Częściowe zachmurzenie';
+  if (c === 3) return 'Pochmurno'; if (c === 45 || c === 48) return 'Mgła'; if (c >= 51 && c <= 57) return 'Mżawka';
+  if (c >= 61 && c <= 67) return 'Deszcz'; if (c >= 71 && c <= 77) return 'Śnieg'; if (c >= 80 && c <= 82) return 'Przelotny deszcz';
+  if (c === 85 || c === 86) return 'Przelotny śnieg'; if (c >= 95) return 'Burza'; return '';
+}
+const IC = {
+  sun: '<svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#F59E0B" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4.5"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>',
+  cloud: '<svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg>',
+  rain: '<svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#7FA3FF" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 16.2A4.5 4.5 0 0 0 17.5 8h-1.8A7 7 0 1 0 4 14.9"/><line x1="8" y1="19" x2="7" y2="22"/><line x1="12" y1="17" x2="11" y2="20"/><line x1="16" y1="19" x2="15" y2="22"/></svg>',
+  snow: '<svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#BFD0FF" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 16.2A4.5 4.5 0 0 0 17.5 8h-1.8A7 7 0 1 0 4 14.9"/><circle cx="8" cy="20" r=".8"/><circle cx="12" cy="18" r=".8"/><circle cx="16" cy="20" r=".8"/><circle cx="12" cy="22" r=".8"/></svg>'
+};
+async function loadWeather() {
+  try {
+    const j = JSON.parse(await nat('weather'));
+    const c = j.current || {};
+    const code = c.weather_code;
+    const snow = (c.snowfall || 0) > 0 || (code >= 71 && code <= 77) || code === 85 || code === 86;
+    const rainy = (c.rain || 0) + (c.showers || 0) > 0 || (code >= 51 && code <= 67) || (code >= 80 && code <= 82) || code >= 95;
+    const precip = c.precipitation || 0;
+    const falling = snow || rainy || precip > 0;
+    const label = falling ? ((snow ? 'Pada śnieg' : 'Pada') + (precip > 0 ? ' · ' + String(precip.toFixed(1)).replace('.', ',') + ' mm/h' : '')) : 'Nie pada';
+    const icon = snow ? IC.snow : rainy || precip > 0 ? IC.rain : (code <= 1 ? IC.sun : IC.cloud);
+    const kier = c.wind_direction_10m != null ? 'z ' + KIER[Math.round(c.wind_direction_10m / 45) % 8] : '';
+    $('weather').innerHTML =
+      '<div class="between"><span class="cap">Pogoda · Łódź</span><span class="badge" style="font-size:13px;padding:6px 10px;border-radius:999px;background:var(' + (falling ? '--rainBg' : '--dryBg') + ');color:var(' + (falling ? '--rainText' : '--dryText') + ')">' + label + '</span></div>' +
+      '<div class="row" style="gap:14px">' + icon +
+      '<div style="display:flex;flex-direction:column;flex:1"><span style="font-size:42px;font-weight:800;letter-spacing:-2px;line-height:1">' + Math.round(c.temperature_2m) + '°</span>' +
+      '<span class="muted" style="font-size:13px;margin-top:4px">Odczuwalna <b style="color:var(--text)">' + Math.round(c.apparent_temperature) + '°</b> · ' + esc(wdesc(code)) + '</span></div>' +
+      '<div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end"><span style="font-size:14px;font-weight:700">Wiatr ' + Math.round(c.wind_speed_10m) + ' km/h</span>' +
+      '<span class="muted small">porywy ' + Math.round(c.wind_gusts_10m) + ' km/h' + (kier ? ' · ' + kier : '') + '</span></div></div>';
+  } catch (e) {
+    $('weather').innerHTML = '<span class="cap">Pogoda · Łódź</span><span class="err">Nie udało się pobrać pogody. Sprawdź internet.</span>';
+  }
+}
+
+// ------------------------------------------------------------ migawka
+function ticketEnd() {
+  if (!S.ticketStart) return null;
+  const p = S.ticketStart.split('-').map(Number);
+  if (p.length !== 3 || !p[0]) return null;
+  return new Date(p[0], p[1] - 1, p[2] + Number(S.ticketDays) - 1);
+}
+const fmtDate = d => pad(d.getDate()) + '.' + pad(d.getMonth() + 1) + '.' + d.getFullYear();
+function renderTicket() {
+  const end = ticketEnd();
+  const ic = c => '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="' + c + '" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink:0"><path d="M3 7a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v3a2 2 0 0 0 0 4v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-3a2 2 0 0 0 0-4z"/><line x1="9" y1="5" x2="9" y2="19" stroke-dasharray="2 2"/></svg>';
+  if (!end) {
+    $('ticket').innerHTML = '<div class="box warn" id="ticketBox">' + ic('var(--warnText)') + '<div style="flex:1"><div class="h">Ustaw migawkę</div><div class="muted" style="font-size:13px">Dotknij, żeby wpisać datę</div></div></div>';
+  } else {
+    const t0 = new Date(); t0.setHours(0, 0, 0, 0);
+    const days = Math.round((end - t0) / 86400000);
+    let tone, title, right;
+    if (days < 0) { tone = 'red'; title = 'Migawka wygasła!'; right = '0 dni'; }
+    else if (days === 0) { tone = 'red'; title = 'Migawka kończy się dziś'; right = 'dziś'; }
+    else if (days <= 5) { tone = 'warn'; title = 'Migawka kończy się wkrótce'; right = days + (days === 1 ? ' dzień' : ' dni'); }
+    else { tone = 'ok'; title = 'Migawka ważna'; right = days + ' dni'; }
+    const col = tone === 'ok' ? 'var(--okText)' : tone === 'warn' ? 'var(--warnText)' : 'var(--redText)';
+    $('ticket').innerHTML = '<div class="box ' + tone + '" id="ticketBox">' + ic(col) +
+      '<div style="flex:1"><div class="h">' + title + '</div><div class="muted" style="font-size:13px">Ważna do ' + fmtDate(end) + '</div></div>' +
+      '<span style="font-size:22px;font-weight:800;color:' + col + '">' + right + '</span></div>';
+  }
+  $('ticketBox').onclick = openSettings;
+}
+function scheduleReminder() {
+  if (!window.Android || !Android.ustawPrzypomnienie) return;
+  const end = ticketEnd();
+  if (!S.remind || !end) { Android.ustawPrzypomnienie(0, ''); return; }
+  const when = new Date(end.getFullYear(), end.getMonth(), end.getDate() - 3, 9, 0, 0);
+  Android.ustawPrzypomnienie(when.getTime(), 'Migawka kończy się ' + fmtDate(end) + ' (za 3 dni). Pamiętaj o nowej!');
+}
+
+// ------------------------------------------------------------ odjazdy
+function pl(n, a, b, c) { return n === 1 ? a : (n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 10 || n % 100 >= 20)) ? b : c; }
+function renderDeps() {
+  const d = last;
+  if (!d) return;
+  const box = $('deps');
+  if (!d.fromFound || !d.toFound) {
+    const which = !d.fromFound ? route().from : route().to;
+    box.innerHTML = '<div class="loading">Nie znalazłem przystanku „' + esc(which) + '” w rozkładzie MPK.<button class="secondary" onclick="openSettings()">Wybierz przystanek</button></div>';
+    $('trackCard').style.display = 'none';
+    return;
+  }
+  const now = Date.now() / 1000;
+  const deps = d.deps.filter(x => x.estDep > now - 30);
+  if (!deps.length) {
+    box.innerHTML = '<div class="loading">Brak tramwajów w najbliższych godzinach na tej trasie (linie ' + esc(S.lines.join(', ')) + ').</div>';
+    $('trackCard').style.display = 'none';
+    return;
+  }
+  box.innerHTML = deps.map(x => {
+    const m = Math.floor((x.estDep - now) / 60);
+    const mins = m <= 0 ? 'teraz' : 'za ' + m + ' min';
+    let badge;
+    if (!x.realtime) badge = '<span class="badge b-plan">rozkład</span>';
+    else if (x.delay >= 60) badge = '<span class="badge b-late">+' + Math.round(x.delay / 60) + ' min</span>';
+    else if (x.delay <= -60) badge = '<span class="badge b-early">' + Math.round(x.delay / 60) + ' min</span>';
+    else badge = '<span class="badge b-ok">planowo</span>';
+    const depClock = hm(new Date(x.estDep * 1000));
+    let where = '';
+    if (x.hasVeh) {
+      if (x.away <= 0) where = x.stopped ? 'stoi na Twoim przystanku' : 'dojeżdża do Twojego przystanku';
+      else where = x.away + ' ' + pl(x.away, 'przystanek', 'przystanki', 'przystanków') + ' od Ciebie';
+    } else if (x.realtime) where = 'jedzie (brak pozycji GPS)';
+    else where = 'jeszcze nie wyjechał / brak danych GPS';
+    return '<div class="dep"><span class="lineno">' + esc(x.line) + '</span>' +
+      '<div style="display:flex;flex-direction:column;gap:2px;flex:1;min-width:0">' +
+      '<div class="row" style="gap:8px"><span class="mins">' + mins + '</span>' + badge + '</div>' +
+      '<span class="muted small">odjazd ' + depClock + (x.realtime && Math.abs(x.delay) >= 60 ? ' (rozkł. ' + esc(x.schedDep) + ')' : '') + ' · przejazd ' + x.rideMin + ' min</span>' +
+      '<span class="where"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg>' + where + '</span>' +
+      '</div><div class="arr"><span class="l">na miejscu</span><span class="t">' + esc(x.arr) + '</span></div></div>';
+  }).join('');
+  renderTrack(deps);
+}
+function renderTrack(deps) {
+  const d = last;
+  if (!d.track || d.track.length < 4 || !deps.some(x => x.hasVeh)) { $('trackCard').style.display = 'none'; return; }
+  const cols = [{ label: 'dalej', trams: [] }];
+  for (let k = 0; k < 3; k++) cols.push({ label: d.track[k] || '—', trams: [] });
+  cols.push({ label: d.track[3], trams: [], me: true });
+  deps.forEach(x => {
+    if (!x.hasVeh) return;
+    const pos = x.away >= 4 ? 0 : (x.away <= 0 ? 4 : 4 - x.away);
+    cols[pos].trams.push(x.line);
+  });
+  $('track').innerHTML = '<div class="rail"></div>' + cols.map(c =>
+    '<div class="tcol"><div class="trams">' + c.trams.map(t => '<span class="tr">' + esc(t) + '</span>').join('') + '</div>' +
+    '<span class="dot' + (c.me ? ' me' : '') + '"></span><span class="tlabel' + (c.me ? ' me' : '') + '">' + esc(c.label) + '</span></div>').join('');
+  $('trackCard').style.display = '';
+}
+function renderAlerts() {
+  const d = last;
+  if (!d || !d.fromFound || !d.toFound) { $('alerts').innerHTML = ''; return; }
+  const warnIc = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--warnText)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink:0;align-self:flex-start"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>';
+  let html = '';
+  if (d.bigDelay) html += '<div class="box warn" style="margin-bottom:10px">' + warnIc + '<div><div class="h">Możliwe utrudnienia</div><div class="t" style="font-size:14px">Tramwaje na Twojej trasie mają duże opóźnienia (ponad 10 min).</div></div></div>';
+  if (d.alerts && d.alerts.length) {
+    html += d.alerts.map(a => '<div class="box warn" style="margin-bottom:10px">' + warnIc + '<div style="display:flex;flex-direction:column;gap:4px;min-width:0">' +
+      '<div class="h">' + esc(a.title || 'Komunikat MPK') + (a.lines && a.lines.length ? ' <span style="font-weight:600;font-size:13px">(linie ' + esc(a.lines.join(', ')) + ')</span>' : '') + '</div>' +
+      (a.text ? '<div class="t" style="font-size:14px;line-height:1.4;white-space:pre-line">' + esc(a.text) + '</div>' : '') + '</div></div>').join('');
+  } else if (!d.bigDelay) {
+    const r = route();
+    html = '<div class="box ok"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--okText)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink:0"><circle cx="12" cy="12" r="10"/><polyline points="8 12.5 11 15.5 16.5 9.5"/></svg>' +
+      '<div><div class="h">Brak utrudnień</div><div class="muted" style="font-size:13px">Linie ' + esc(S.lines.join(', ')) + ' · ' + esc(r.from) + ' – ' + esc(r.to) + '</div></div></div>';
+  }
+  $('alerts').innerHTML = html;
+}
+
+async function refresh(manual) {
+  if (loading) return;
+  loading = true;
+  $('btnRefresh').classList.add('spin');
+  if (manual) loadWeather();
+  const r = route();
+  try {
+    const t = await nat('dashboard', JSON.stringify({ from: r.from, to: r.to, lines: S.lines, count: 3 }));
+    last = JSON.parse(t);
+    renderDeps();
+    renderAlerts();
+    const at = hm(new Date());
+    $('status').innerHTML = '<span class="live' + (last.rtOk ? '' : ' off') + '"></span>' +
+      (last.rtOk ? 'Na żywo z MPK · ' + (manual ? 'odświeżono ' : 'zaktualizowano ') + at + ' · auto co 30 s' : 'Brak danych na żywo – pokazuję rozkład · ' + at);
+  } catch (e) {
+    $('status').innerHTML = '<span class="err">Błąd pobierania: ' + esc(e.message) + '. Sprawdź internet i dotknij „Odśwież”.</span>';
+    if (!last) $('deps').innerHTML = '<div class="loading">Nie udało się pobrać danych.</div>';
+  } finally {
+    loading = false;
+    $('btnRefresh').classList.remove('spin');
+  }
+}
+function startAuto() { stopAuto(); timer = setInterval(() => refresh(false), 30000); }
+function stopAuto() { if (timer) clearInterval(timer); timer = null; }
+window.onAppResume = () => {
+  if (S.autoHome && !manualDir) { const nd = new Date().getHours() >= 14 ? 'home' : 'work'; if (nd !== dir) { dir = nd; renderTabs(); last = null; } }
+  refresh(false); loadWeather(); renderTicket(); startAuto();
+};
+window.onAppPause = stopAuto;
+
+// ------------------------------------------------------------ ekran ustawień
+let draft = null;
+function openSettings() {
+  draft = JSON.parse(JSON.stringify(S));
+  $('inFrom').value = draft.from;
+  $('inTo').value = draft.to;
+  $('inStart').value = draft.ticketStart || '';
+  renderDraft();
+  $('settings').classList.add('open');
+  window.scrollTo(0, 0);
+  nat('lines').then(t => { draft.allLines = JSON.parse(t); renderChips(); }).catch(() => { draft.allLines = draft.lines; renderChips(); });
+  nat('init').then(t => { const i = JSON.parse(t); $('gtfsInfo').textContent = i.updated ? 'Rozkład pobrany: ' + fmtDate(new Date(i.updated)) + ' ' + hm(new Date(i.updated)) + ' (odświeża się sam raz na dobę)' : '—'; }).catch(() => {});
+}
+function closeSettings() { $('settings').classList.remove('open'); hideSugg('suggFrom'); hideSugg('suggTo'); }
+function renderDraft() {
+  $('d30').classList.toggle('on', Number(draft.ticketDays) === 30);
+  $('d90').classList.toggle('on', Number(draft.ticketDays) === 90);
+  $('swRemind').classList.toggle('on', !!draft.remind);
+  $('swDark').classList.toggle('on', !!draft.dark);
+  $('swAuto').classList.toggle('on', !!draft.autoHome);
+  const keep = S; S = draft; const end = ticketEnd(); S = keep;
+  $('endText').textContent = end ? fmtDate(end) : 'wybierz datę';
+}
+function renderChips() {
+  const all = (draft.allLines || []).slice();
+  draft.lines.forEach(l => { if (all.indexOf(l) < 0) all.push(l); });
+  $('chips').innerHTML = all.map(l => '<button class="chip' + (draft.lines.indexOf(l) >= 0 ? ' on' : '') + '" data-l="' + esc(l) + '" aria-pressed="' + (draft.lines.indexOf(l) >= 0) + '">' + esc(l) + '</button>').join('');
+  $('chips').querySelectorAll('button').forEach(b => b.onclick = () => {
+    const l = b.getAttribute('data-l'), i = draft.lines.indexOf(l);
+    if (i >= 0) draft.lines.splice(i, 1); else draft.lines.push(l);
+    renderChips();
+  });
+}
+function hideSugg(id) { $(id).style.display = 'none'; $(id).innerHTML = ''; }
+function bindSearch(inputId, suggId, key) {
+  let seq = 0;
+  $(inputId).addEventListener('input', async () => {
+    const q = $(inputId).value.trim();
+    draft[key] = $(inputId).value.trim();
+    if (q.length < 2) { hideSugg(suggId); return; }
+    const my = ++seq;
+    try {
+      const list = JSON.parse(await nat('search', q));
+      if (my !== seq) return;
+      if (!list.length) { $(suggId).innerHTML = '<button disabled>Brak przystanku tramwajowego o tej nazwie</button>'; $(suggId).style.display = ''; return; }
+      $(suggId).innerHTML = list.map(s => '<button data-n="' + esc(s.name) + '">' + esc(s.name) + ' <span>· ' + esc(s.lines) + '</span></button>').join('');
+      $(suggId).style.display = '';
+      $(suggId).querySelectorAll('button[data-n]').forEach(b => b.onclick = () => {
+        draft[key] = b.getAttribute('data-n');
+        $(inputId).value = draft[key];
+        hideSugg(suggId);
+      });
+    } catch (e) { hideSugg(suggId); }
+  });
+}
+
+// ------------------------------------------------------------ odświeżanie gestem (pociągnij w dół)
+(function () {
+  let y0 = null, dy = 0;
+  window.addEventListener('touchstart', e => { if (window.scrollY <= 0 && !$('settings').classList.contains('open')) { y0 = e.touches[0].clientY; dy = 0; } }, { passive: true });
+  window.addEventListener('touchmove', e => {
+    if (y0 == null) return;
+    dy = e.touches[0].clientY - y0;
+    if (dy > 0) { $('ptr').style.transition = 'none'; $('ptr').style.height = Math.min(60, dy / 2) + 'px'; $('ptr').textContent = dy > 120 ? 'Puść, aby odświeżyć' : 'Pociągnij, aby odświeżyć'; }
+  }, { passive: true });
+  window.addEventListener('touchend', () => {
+    if (y0 == null) return;
+    $('ptr').style.transition = ''; $('ptr').style.height = '0';
+    if (dy > 120) refresh(true);
+    y0 = null;
+  });
+})();
+
+// ------------------------------------------------------------ zdarzenia
+$('btnRefresh').onclick = () => refresh(true);
+$('btnTheme').onclick = () => { S.dark = !S.dark; save(); applyTheme(); };
+$('btnSettings').onclick = openSettings;
+$('btnChange').onclick = openSettings;
+$('tabWork').onclick = () => { if (dir !== 'work') { dir = 'work'; manualDir = true; last = null; renderTabs(); $('deps').innerHTML = '<div class="loading">Ładowanie…</div>'; refresh(false); } };
+$('tabHome').onclick = () => { if (dir !== 'home') { dir = 'home'; manualDir = true; last = null; renderTabs(); $('deps').innerHTML = '<div class="loading">Ładowanie…</div>'; refresh(false); } };
+$('btnBack').onclick = closeSettings;
+window.onAndroidBack = () => { if ($('settings').classList.contains('open')) { closeSettings(); return true; } return false; };
+$('btnSwap').onclick = () => { const a = draft.from; draft.from = draft.to; draft.to = a; $('inFrom').value = draft.from; $('inTo').value = draft.to; };
+$('d30').onclick = () => { draft.ticketDays = 30; renderDraft(); };
+$('d90').onclick = () => { draft.ticketDays = 90; renderDraft(); };
+$('inStart').onchange = () => { draft.ticketStart = $('inStart').value; renderDraft(); };
+$('swRemind').onclick = () => { draft.remind = !draft.remind; renderDraft(); };
+$('swDark').onclick = () => { draft.dark = !draft.dark; renderDraft(); };
+$('swAuto').onclick = () => { draft.autoHome = !draft.autoHome; renderDraft(); };
+$('btnGtfs').onclick = async () => {
+  $('gtfsInfo').textContent = 'Pobieram rozkład MPK (ok. 10 MB)…';
+  try { const i = JSON.parse(await nat('updateGtfs')); $('gtfsInfo').textContent = 'Rozkład pobrany: ' + fmtDate(new Date(i.updated)) + ' ' + hm(new Date(i.updated)); }
+  catch (e) { $('gtfsInfo').textContent = 'Nie udało się: ' + e.message; }
+};
+$('btnSave').onclick = () => {
+  if (!draft.lines.length) { alert('Zaznacz przynajmniej jedną linię.'); return; }
+  delete draft.allLines;
+  S = draft;
+  save();
+  applyTheme();
+  if (S.remind && window.Android && Android.zgodaNaPowiadomienia) Android.zgodaNaPowiadomienia();
+  scheduleReminder();
+  closeSettings();
+  renderTabs(); renderTicket();
+  last = null; $('deps').innerHTML = '<div class="loading">Ładowanie…</div>';
+  refresh(false);
+};
+bindSearch('inFrom', 'suggFrom', 'from');
+bindSearch('inTo', 'suggTo', 'to');
+
+// ------------------------------------------------------------ start
+async function start() {
+  applyTheme(); renderTabs(); renderTicket(); tick();
+  setInterval(tick, 15000);
+  setInterval(() => { const d = new Date(); $('clock').textContent = hm(d); }, 1000);
+  loadWeather();
+  $('deps').innerHTML = '<div class="loading">Pierwsze uruchomienie: pobieram rozkład MPK (ok. 10 MB) i przygotowuję dane…<br>To potrwa do minuty, potem będzie już szybko.</div>';
+  try { await nat('init'); } catch (e) {
+    $('deps').innerHTML = '<div class="loading"><span class="err">Nie udało się pobrać rozkładu MPK: ' + esc(e.message) + '</span><button class="secondary" onclick="start()">Spróbuj ponownie</button></div>';
+    return;
+  }
+  // domyślny przystanek „Blok 270” - jeśli w rozkładzie nazywa się inaczej, spróbuj dopasować
+  if (!localStorage.getItem('mytram')) {
+    try {
+      const l = JSON.parse(await nat('search', S.from));
+      if (!l.some(x => x.name.toLowerCase() === S.from.toLowerCase())) {
+        const alt = JSON.parse(await nat('search', '270'));
+        if (alt.length) S.from = alt[0].name;
+      }
+    } catch (e) {}
+    save(); renderTabs();
+  }
+  scheduleReminder();
+  await refresh(false);
+  startAuto();
+}
+
+// ------------------------------------------------------------ podgląd w przeglądarce (bez Androida)
+function MOCK(method, arg) {
+  const now = Math.floor(Date.now() / 1000);
+  const data = {
+    init: '{"loaded":true,"updated":' + Date.now() + ',"trips":1000}',
+    lines: '["1","2","3","6","8","10","11","12","13","15","16","18"]',
+    search: '[{"name":"Blok 270","lines":"10, 12, 18"},{"name":"Piotrkowska Centrum","lines":"8, 10, 12, 18"}]',
+    weather: '{"current":{"temperature_2m":5.6,"apparent_temperature":1.8,"precipitation":0,"rain":0,"showers":0,"snowfall":0,"weather_code":3,"wind_speed_10m":18,"wind_direction_10m":225,"wind_gusts_10m":35}}',
+    dashboard: JSON.stringify({ fromFound: true, toFound: true, from: route().from, to: route().to, rtOk: true, now, bigDelay: false,
+      deps: [
+        { line: '10', headsign: 'Stoki', schedDep: '07:41', estDep: now + 190, estArr: now + 1090, arr: hm(new Date((now + 1090) * 1000)), rideMin: 15, delay: 70, realtime: true, hasVeh: true, away: 2, stopped: false },
+        { line: '18', headsign: 'Stoki', schedDep: '07:48', estDep: now + 540, estArr: now + 1440, arr: hm(new Date((now + 1440) * 1000)), rideMin: 15, delay: 0, realtime: true, hasVeh: true, away: 5, stopped: false },
+        { line: '12', headsign: 'Stoki', schedDep: '07:53', estDep: now + 840, estArr: now + 1680, arr: hm(new Date((now + 1680) * 1000)), rideMin: 14, delay: 0, realtime: false, hasVeh: false, away: -99, stopped: false }],
+      track: ['Przystanek A', 'Przystanek B', 'Przystanek C', route().from],
+      alerts: [] })
+  };
+  return new Promise(r => setTimeout(() => r(data[method] || '{}'), 150));
+}
+
+start();
+</script>
+</body>
+</html>

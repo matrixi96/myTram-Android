@@ -1,0 +1,41 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'pl.mytram.app'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId 'pl.mytram.app'
+        minSdk 26
+        targetSdk 34
+        versionCode 1
+        versionName '1.0'
+    }
+
+    // Stały klucz podpisu - nowa wersja APK instaluje się na starą bez utraty ustawień.
+    signingConfigs {
+        stale {
+            storeFile file('mytram.keystore')
+            storePassword 'mytram123'
+            keyAlias 'mytram'
+            keyPassword 'mytram123'
+        }
+    }
+
+    buildTypes {
+        debug {
+            signingConfig signingConfigs.stale
+        }
+        release {
+            minifyEnabled false
+            signingConfig signingConfigs.stale
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
