@@ -49,6 +49,7 @@ final class Gtfs {
     final HashMap<String, Integer> calDates = new HashMap<>();    // service|yyyymmdd -> 1 dodany / 2 usunięty
 
     // pomocnicze (liczone po wczytaniu)
+    String[] normName = new String[0];
     String[] lines = new String[0];
     final HashMap<String, TreeSet<String>> linesAtName = new HashMap<>();
 
@@ -214,24 +215,37 @@ final class Gtfs {
                 }
             }
         }
+        if (prog != null) prog.set("index", 0, 0);
         g.buildIndexes();
         return g;
     }
 
     private void buildIndexes() {
+        int ns = stopName.length;
+        normName = new String[ns];
+        for (int i = 0; i < ns; i++) normName[i] = norm(stopName[i]);
+        // linie zatrzymujące się na każdym słupku (po indeksie - bez operacji na tekstach w pętli)
+        java.util.BitSet[] lineAt = new java.util.BitSet[ns];
         TreeSet<String> ls = new TreeSet<>(Gtfs::compareLines);
-        linesAtName.clear();
+        for (int t = 0; t < nTrips; t++) if (tStop[t].length > 0) ls.add(tripLine[t]);
+        lines = ls.toArray(new String[0]);
+        HashMap<String, Integer> lineNo = new HashMap<>();
+        for (int i = 0; i < lines.length; i++) lineNo.put(lines[i], i);
         for (int t = 0; t < nTrips; t++) {
             if (tStop[t].length == 0) continue;
-            ls.add(tripLine[t]);
+            int ln = lineNo.get(tripLine[t]);
             for (int s : tStop[t]) {
-                String key = norm(stopName[s]);
-                TreeSet<String> set = linesAtName.get(key);
-                if (set == null) { set = new TreeSet<>(Gtfs::compareLines); linesAtName.put(key, set); }
-                set.add(tripLine[t]);
+                if (lineAt[s] == null) lineAt[s] = new java.util.BitSet();
+                lineAt[s].set(ln);
             }
         }
-        lines = ls.toArray(new String[0]);
+        linesAtName.clear();
+        for (int i = 0; i < ns; i++) {
+            if (lineAt[i] == null) continue;
+            TreeSet<String> set = linesAtName.get(normName[i]);
+            if (set == null) { set = new TreeSet<>(Gtfs::compareLines); linesAtName.put(normName[i], set); }
+            for (int b = lineAt[i].nextSetBit(0); b >= 0; b = lineAt[i].nextSetBit(b + 1)) set.add(lines[b]);
+        }
     }
 
     // ------------------------------------------------------------------ zapis / odczyt pamięci podręcznej
@@ -311,14 +325,14 @@ final class Gtfs {
     boolean[] stopsNamed(String name) {
         boolean[] m = new boolean[stopId.length];
         String n = norm(name);
-        for (int i = 0; i < stopId.length; i++) if (norm(stopName[i]).equals(n)) m[i] = true;
+        for (int i = 0; i < stopId.length; i++) if (normName[i].equals(n)) m[i] = true;
         return m;
     }
 
     /** Nazwa przystanku w oryginalnej pisowni (albo null, gdy brak). */
     String canonicalName(String name) {
         String n = norm(name);
-        for (String s : stopName) if (norm(s).equals(n)) return s;
+        for (int i = 0; i < stopName.length; i++) if (normName[i].equals(n)) return stopName[i];
         return null;
     }
 
@@ -327,8 +341,8 @@ final class Gtfs {
         String nq = norm(q);
         TreeSet<String> seen = new TreeSet<>();
         ArrayList<String[]> starts = new ArrayList<>(), contains = new ArrayList<>();
-        for (String s : stopName) {
-            String n = norm(s);
+        for (int i = 0; i < stopName.length; i++) {
+            String s = stopName[i], n = normName[i];
             if (seen.contains(n)) continue;
             TreeSet<String> l = linesAtName.get(n);
             if (l == null) continue; // brak tramwajów

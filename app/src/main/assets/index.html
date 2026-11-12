@@ -440,7 +440,8 @@ function openSettings() {
   $('chips').innerHTML = '<span class="muted small" id="chipsWait">Wczytuję listę linii (czekam na rozkład)…</span>';
   const stopL = withProgress($('gtfsInfo'), t => esc(t));
   nat('lines').then(t => { stopL(); draft.allLines = JSON.parse(t); renderChips(); }).catch(() => { stopL(); draft.allLines = draft.lines; renderChips(); });
-  nat('init').then(t => { const i = JSON.parse(t); $('gtfsInfo').textContent = i.updated ? 'Rozkład pobrany: ' + fmtDate(new Date(i.updated)) + ' ' + hm(new Date(i.updated)) + ' (odświeża się sam raz na dobę)' : '—'; }).catch(() => {});
+  nat('init').then(t => { stopL(); const i = JSON.parse(t); $('gtfsInfo').textContent = i.updated ? 'Rozkład gotowy · pobrany ' + fmtDate(new Date(i.updated)) + ' ' + hm(new Date(i.updated)) + ' (odświeża się sam raz na dobę)' : '—'; })
+    .catch(e => { stopL(); $('gtfsInfo').innerHTML = '<span class="err">Błąd rozkładu: ' + esc(e.message) + '</span>'; });
 }
 function closeSettings() { $('settings').classList.remove('open'); hideSugg('suggFrom'); hideSugg('suggTo'); }
 function renderDraft() {
@@ -522,7 +523,7 @@ $('btnGtfs').onclick = async () => {
   $('btnGtfs').disabled = true;
   $('gtfsInfo').textContent = 'Pobieram rozkład MPK…';
   const stopP = withProgress($('gtfsInfo'), t => esc(t));
-  try { const i = JSON.parse(await nat('updateGtfs')); $('gtfsInfo').textContent = 'Rozkład pobrany: ' + fmtDate(new Date(i.updated)) + ' ' + hm(new Date(i.updated)); }
+  try { const i = JSON.parse(await nat('updateGtfs')); $('gtfsInfo').textContent = 'Rozkład gotowy · pobrany ' + fmtDate(new Date(i.updated)) + ' ' + hm(new Date(i.updated)); }
   catch (e) { $('gtfsInfo').textContent = /busy$/.test(e.message) ? 'Rozkład już się pobiera – poczekaj chwilę.' : 'Nie udało się: ' + e.message; }
   finally { stopP(); $('btnGtfs').disabled = false; }
 };
@@ -549,6 +550,7 @@ function progressText() {
   let p; try { p = JSON.parse(Android.postep()); } catch (e) { return ''; }
   if (p.stage === 'download') return p.total > 0 ? 'Pobieram rozkład MPK: ' + mb(p.done) + ' / ' + mb(p.total) + ' MB (' + Math.floor(100 * p.done / p.total) + '%)' : 'Pobieram rozkład MPK: ' + mb(p.done) + ' MB…';
   if (p.stage === 'parse') return p.total > 0 ? 'Przygotowuję rozkład: ' + Math.min(99, Math.floor(100 * p.done / p.total)) + '%' : 'Przygotowuję rozkład…';
+  if (p.stage === 'index') return 'Porządkuję przystanki i linie…';
   if (p.stage === 'save') return 'Zapisuję rozkład na telefonie…';
   if (p.stage === 'load') return 'Wczytuję rozkład…';
   return '';
