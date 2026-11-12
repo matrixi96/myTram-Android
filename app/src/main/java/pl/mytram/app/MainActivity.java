@@ -30,7 +30,7 @@ public class MainActivity extends Activity {
 
     private WebView web;
     private Engine engine;
-    private final ExecutorService pool = Executors.newFixedThreadPool(3);
+    private final ExecutorService pool = Executors.newFixedThreadPool(4);
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -81,6 +81,12 @@ public class MainActivity extends Activity {
     /** Most JS -> Android. */
     private class Most {
 
+        /** Postęp pobierania/przygotowania rozkładu - odpowiedź od razu, bez kolejki. */
+        @JavascriptInterface
+        public String postep() {
+            return engine.progressJson();
+        }
+
         /** Zapytanie asynchroniczne: odpowiedź przychodzi do window.__res(id, ok, tekst). */
         @JavascriptInterface
         public void call(final String id, final String method, final String arg) {
@@ -93,7 +99,7 @@ public class MainActivity extends Activity {
                             r = engine.gtfsInfoJson();
                             break;
                         case "updateGtfs":
-                            engine.ensureGtfs(true);
+                            if ("busy".equals(engine.ensureGtfs(true))) throw new IllegalStateException("busy");
                             r = engine.gtfsInfoJson();
                             break;
                         case "lines":

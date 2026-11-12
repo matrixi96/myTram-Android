@@ -54,7 +54,11 @@ final class Gtfs {
 
     // ------------------------------------------------------------------ parsowanie GTFS.zip
 
-    static Gtfs parseZip(File zipFile) throws IOException {
+    interface Prog { void set(String stage, long done, long total); }
+
+    static Gtfs parseZip(File zipFile) throws IOException { return parseZip(zipFile, null); }
+
+    static Gtfs parseZip(File zipFile, Prog prog) throws IOException {
         Gtfs g = new Gtfs();
         try (ZipFile z = new ZipFile(zipFile)) {
             // routes.txt - tylko tramwaje (route_type 0 lub 900-999)
@@ -125,20 +129,38 @@ final class Gtfs {
             IntList[] stops = new IntList[nt], seqs = new IntList[nt], arrs = new IntList[nt], deps = new IntList[nt];
             try (Csv c = Csv.open(z, "stop_times.txt")) {
                 int iTrip = c.col("trip_id"), iArr = c.col("arrival_time"), iDep = c.col("departure_time"), iStop = c.col("stop_id"), iSeq = c.col("stop_sequence");
-                String[] r;
-                while ((r = c.row()) != null) {
-                    Integer t = g.tripIdx.get(c.get(r, iTrip));
-                    if (t == null) continue;
-                    Integer s = g.stopIdx.get(c.get(r, iStop));
+                int maxCol = Math.max(Math.max(Math.max(iTrip, iArr), Math.max(iDep, iStop)), iSeq);
+                String[] f = new String[maxCol + 1];
+                String line, lastTrip = null;
+                int lastT = -1;
+                long n = 0;
+                while ((line = c.line()) != null) {
+                    if ((++n & 16383) == 0 && prog != null) prog.set("parse", c.bytesRead(), c.size);
+                    if (line.isEmpty()) continue;
+                    if (line.indexOf('"') >= 0) {
+                        String[] r = Csv.split(line);
+                        for (int k = 0; k <= maxCol; k++) f[k] = k < r.length ? r[k] : "";
+                    } else fastFields(line, f, maxCol);
+                    String tid = iTrip < 0 ? "" : f[iTrip];
+                    int t;
+                    if (tid.equals(lastTrip)) t = lastT;
+                    else {
+                        Integer ti = g.tripIdx.get(tid);
+                        t = ti == null ? -1 : ti;
+                        lastTrip = tid;
+                        lastT = t;
+                    }
+                    if (t < 0) continue;
+                    Integer s = iStop < 0 ? null : g.stopIdx.get(f[iStop]);
                     if (s == null) continue;
-                    int dep = parseTime(c.get(r, iDep));
-                    int arr = parseTime(c.get(r, iArr));
+                    int dep = iDep < 0 ? -1 : parseTime(f[iDep]);
+                    int arr = iArr < 0 ? -1 : parseTime(f[iArr]);
                     if (dep < 0) dep = arr;
                     if (arr < 0) arr = dep;
                     if (dep < 0) continue;
                     if (stops[t] == null) { stops[t] = new IntList(); seqs[t] = new IntList(); arrs[t] = new IntList(); deps[t] = new IntList(); }
                     stops[t].add(s);
-                    seqs[t].add(parseIntSafe(c.get(r, iSeq), stops[t].size));
+                    seqs[t].add(iSeq < 0 ? stops[t].size : parseIntSafe(f[iSeq], stops[t].size));
                     arrs[t].add(arr);
                     deps[t].add(dep);
                 }
@@ -343,15 +365,31 @@ final class Gtfs {
     }
 
     static int parseTime(String s) {
-        if (s == null || s.isEmpty()) return -1;
-        String[] p = s.trim().split(":");
-        if (p.length < 2) return -1;
-        try {
-            int h = Integer.parseInt(p[0].trim()), m = Integer.parseInt(p[1].trim());
-            int sec = p.length > 2 ? Integer.parseInt(p[2].trim()) : 0;
-            return h * 3600 + m * 60 + sec;
-        } catch (NumberFormatException e) {
-            return -1;
+        if (s == null) return -1;
+        int v = 0, part = 0, total = 0, len = s.length();
+        boolean any = false;
+        for (int i = 0; i < len; i++) {
+            char ch = s.charAt(i);
+            if (ch >= '0' && ch <= '9') { v = v * 10 + (ch - '0'); any = true; }
+            else if (ch == ':') {
+                total = total * 60 + v; v = 0; part++;
+            } else if (ch != ' ') return -1;
+        }
+        if (!any || part < 1) return -1;
+        total = total * 60 + v;
+        if (part == 1) total *= 60; // HH:MM
+        return total;
+    }
+
+    /** Dzieli wiersz bez cudzysłowów na pola 0..maxCol (reszta ignorowana). */
+    static void fastFields(String line, String[] out, int maxCol) {
+        int start = 0;
+        for (int k = 0; k <= maxCol; k++) {
+            if (start > line.length()) { out[k] = ""; continue; }
+            int e = line.indexOf(',', start);
+            if (e < 0) e = line.length();
+            out[k] = line.substring(start, e);
+            start = e + 1;
         }
     }
 
@@ -376,8 +414,18 @@ final class Gtfs {
     static final class Csv implements AutoCloseable {
         private final BufferedReader r;
         private final HashMap<String, Integer> head = new HashMap<>();
+        private final long[] counter = new long[1];
+        long size = -1;
 
-        private Csv(InputStream in) throws IOException {
+        long bytesRead() { return counter[0]; }
+
+        String line() throws IOException { return r.readLine(); }
+
+        private Csv(InputStream raw) throws IOException {
+            InputStream in = new java.io.FilterInputStream(raw) {
+                @Override public int read() throws IOException { int b = super.read(); if (b >= 0) counter[0]++; return b; }
+                @Override public int read(byte[] b, int off, int len) throws IOException { int n = super.read(b, off, len); if (n > 0) counter[0] += n; return n; }
+            };
             r = new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8), 1 << 16);
             String h = r.readLine();
             if (h == null) return;
@@ -397,7 +445,9 @@ final class Gtfs {
                 }
             }
             if (e == null) throw new IOException("brak pliku " + name + " w GTFS");
-            return new Csv(z.getInputStream(e));
+            Csv c = new Csv(z.getInputStream(e));
+            c.size = e.getSize();
+            return c;
         }
 
         int col(String name) {

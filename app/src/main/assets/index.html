@@ -437,7 +437,9 @@ function openSettings() {
   renderDraft();
   $('settings').classList.add('open');
   window.scrollTo(0, 0);
-  nat('lines').then(t => { draft.allLines = JSON.parse(t); renderChips(); }).catch(() => { draft.allLines = draft.lines; renderChips(); });
+  $('chips').innerHTML = '<span class="muted small" id="chipsWait">Wczytuję listę linii (czekam na rozkład)…</span>';
+  const stopL = withProgress($('gtfsInfo'), t => esc(t));
+  nat('lines').then(t => { stopL(); draft.allLines = JSON.parse(t); renderChips(); }).catch(() => { stopL(); draft.allLines = draft.lines; renderChips(); });
   nat('init').then(t => { const i = JSON.parse(t); $('gtfsInfo').textContent = i.updated ? 'Rozkład pobrany: ' + fmtDate(new Date(i.updated)) + ' ' + hm(new Date(i.updated)) + ' (odświeża się sam raz na dobę)' : '—'; }).catch(() => {});
 }
 function closeSettings() { $('settings').classList.remove('open'); hideSugg('suggFrom'); hideSugg('suggTo'); }
@@ -517,9 +519,12 @@ $('swRemind').onclick = () => { draft.remind = !draft.remind; renderDraft(); };
 $('swDark').onclick = () => { draft.dark = !draft.dark; renderDraft(); };
 $('swAuto').onclick = () => { draft.autoHome = !draft.autoHome; renderDraft(); };
 $('btnGtfs').onclick = async () => {
-  $('gtfsInfo').textContent = 'Pobieram rozkład MPK (ok. 10 MB)…';
+  $('btnGtfs').disabled = true;
+  $('gtfsInfo').textContent = 'Pobieram rozkład MPK…';
+  const stopP = withProgress($('gtfsInfo'), t => esc(t));
   try { const i = JSON.parse(await nat('updateGtfs')); $('gtfsInfo').textContent = 'Rozkład pobrany: ' + fmtDate(new Date(i.updated)) + ' ' + hm(new Date(i.updated)); }
-  catch (e) { $('gtfsInfo').textContent = 'Nie udało się: ' + e.message; }
+  catch (e) { $('gtfsInfo').textContent = /busy$/.test(e.message) ? 'Rozkład już się pobiera – poczekaj chwilę.' : 'Nie udało się: ' + e.message; }
+  finally { stopP(); $('btnGtfs').disabled = false; }
 };
 $('btnSave').onclick = () => {
   if (!draft.lines.length) { alert('Zaznacz przynajmniej jedną linię.'); return; }
@@ -537,6 +542,22 @@ $('btnSave').onclick = () => {
 bindSearch('inFrom', 'suggFrom', 'from');
 bindSearch('inTo', 'suggTo', 'to');
 
+// ------------------------------------------------------------ postęp rozkładu
+const mb = b => (b / 1048576).toFixed(1).replace('.', ',');
+function progressText() {
+  if (!window.Android || !Android.postep) return '';
+  let p; try { p = JSON.parse(Android.postep()); } catch (e) { return ''; }
+  if (p.stage === 'download') return p.total > 0 ? 'Pobieram rozkład MPK: ' + mb(p.done) + ' / ' + mb(p.total) + ' MB (' + Math.floor(100 * p.done / p.total) + '%)' : 'Pobieram rozkład MPK: ' + mb(p.done) + ' MB…';
+  if (p.stage === 'parse') return p.total > 0 ? 'Przygotowuję rozkład: ' + Math.min(99, Math.floor(100 * p.done / p.total)) + '%' : 'Przygotowuję rozkład…';
+  if (p.stage === 'save') return 'Zapisuję rozkład na telefonie…';
+  if (p.stage === 'load') return 'Wczytuję rozkład…';
+  return '';
+}
+function withProgress(el, prefix) {
+  const iv = setInterval(() => { const t = progressText(); if (t) el.innerHTML = prefix(t); }, 400);
+  return () => clearInterval(iv);
+}
+
 // ------------------------------------------------------------ start
 async function start() {
   applyTheme(); renderTabs(); renderTicket(); tick();
@@ -544,7 +565,9 @@ async function start() {
   setInterval(() => { const d = new Date(); $('clock').textContent = hm(d); }, 1000);
   loadWeather();
   $('deps').innerHTML = '<div class="loading">Pierwsze uruchomienie: pobieram rozkład MPK (ok. 10 MB) i przygotowuję dane…<br>To potrwa do minuty, potem będzie już szybko.</div>';
-  try { await nat('init'); } catch (e) {
+  const stopP = withProgress($('deps'), t => '<div class="loading">' + esc(t) + '<br><span class="small">Przy pierwszym uruchomieniu to może chwilę potrwać, potem będzie szybko.</span></div>');
+  try { await nat('init'); stopP(); } catch (e) {
+    stopP();
     $('deps').innerHTML = '<div class="loading"><span class="err">Nie udało się pobrać rozkładu MPK: ' + esc(e.message) + '</span><button class="secondary" onclick="start()">Spróbuj ponownie</button></div>';
     return;
   }

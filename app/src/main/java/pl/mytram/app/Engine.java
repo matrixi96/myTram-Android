@@ -34,7 +34,18 @@ final class Engine {
     private static final long GTFS_MAX_AGE_MS = 24L * 3600 * 1000; // rozkład odświeżany raz na dobę
 
     private final File dir;
-    private Gtfs gtfs;
+    private volatile Gtfs gtfs;
+
+    // postęp pobierania / przygotowania rozkładu (czytany bez blokady)
+    volatile String stage = "";
+    volatile long pDone, pTotal;
+    private final java.util.concurrent.atomic.AtomicBoolean busy = new java.util.concurrent.atomic.AtomicBoolean(false);
+
+    String progressJson() {
+        return "{\"stage\":\"" + stage + "\",\"done\":" + pDone + ",\"total\":" + pTotal + ",\"busy\":" + busy.get() + ",\"loaded\":" + (gtfs != null) + "}";
+    }
+
+    private void prog(String st, long done, long total) { stage = st; pDone = done; pTotal = total; }
     private long gtfsLoadedFrom;
 
     Engine(File dir) { this.dir = dir; }
@@ -42,14 +53,28 @@ final class Engine {
     // ------------------------------------------------------------------ rozkład
 
     /** Wczytuje rozkład (z pamięci, z dysku albo pobiera). Zwraca opis stanu. */
-    synchronized String ensureGtfs(boolean force) throws IOException {
+    String ensureGtfs(boolean force) throws IOException {
+        if (force && busy.get()) return "busy"; // już pobieram - nie zaczynaj drugi raz
+        synchronized (this) {
+            busy.set(true);
+            try {
+                return ensureGtfsLocked(force);
+            } finally {
+                busy.set(false);
+                prog("", 0, 0);
+            }
+        }
+    }
+
+    private String ensureGtfsLocked(boolean force) throws IOException {
         File zip = new File(dir, "GTFS.zip");
         File cache = new File(dir, "gtfs.bin");
         boolean stale = !zip.exists() || System.currentTimeMillis() - zip.lastModified() > GTFS_MAX_AGE_MS;
         if (force || stale) {
             try {
                 File tmp = new File(dir, "GTFS.zip.part");
-                download(GTFS_URL, tmp);
+                prog("download", 0, 0);
+                download(GTFS_URL, tmp, this);
                 if (zip.exists()) zip.delete();
                 if (!tmp.renameTo(zip)) throw new IOException("zapis rozkładu");
                 cache.delete();
@@ -60,6 +85,7 @@ final class Engine {
         if (gtfs != null && cache.exists() && gtfsLoadedFrom == cache.lastModified()) return "ok";
         if (cache.exists() && (!zip.exists() || cache.lastModified() >= zip.lastModified())) {
             try {
+                prog("load", 0, 0);
                 gtfs = Gtfs.load(cache);
                 gtfsLoadedFrom = cache.lastModified();
                 return "ok";
@@ -67,9 +93,12 @@ final class Engine {
                 cache.delete();
             }
         }
-        gtfs = Gtfs.parseZip(zip);
+        prog("parse", 0, 0);
+        Gtfs g = Gtfs.parseZip(zip, this::prog);
+        prog("save", 0, 0);
+        gtfs = g;
         try {
-            gtfs.save(cache);
+            g.save(cache);
             gtfsLoadedFrom = cache.lastModified();
         } catch (IOException ignored) { }
         return "ok";
@@ -347,20 +376,31 @@ final class Engine {
         }
     }
 
-    static void download(String url, File to) throws IOException {
+    static void download(String url, File to) throws IOException { download(url, to, null); }
+
+    static void download(String url, File to, Engine e) throws IOException {
         if (fetcher != null) { try (OutputStream o = new FileOutputStream(to)) { o.write(fetcher.get(url)); } return; }
         HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
-        c.setConnectTimeout(15000);
-        c.setReadTimeout(60000);
-        c.setRequestProperty("User-Agent", "myTram/1.0 (Android)");
+        c.setConnectTimeout(20000);
+        c.setReadTimeout(30000);
+        c.setRequestProperty("User-Agent", "myTram/1.1 (Android)");
+        long deadline = System.currentTimeMillis() + 6 * 60 * 1000;
         try {
             int code = c.getResponseCode();
-            if (code != 200) throw new IOException("HTTP " + code);
+            if (code != 200) throw new IOException("serwer MPK odpowiedział HTTP " + code);
+            long total = c.getContentLengthLong();
+            long done = 0;
             try (InputStream in = c.getInputStream(); OutputStream out = new FileOutputStream(to)) {
                 byte[] buf = new byte[65536];
                 int n;
-                while ((n = in.read(buf)) > 0) out.write(buf, 0, n);
+                while ((n = in.read(buf)) > 0) {
+                    out.write(buf, 0, n);
+                    done += n;
+                    if (e != null) e.prog("download", done, total);
+                    if (System.currentTimeMillis() > deadline) throw new IOException("pobieranie trwa za długo (serwer MPK odpowiada bardzo wolno)");
+                }
             }
+            if (total > 0 && done < total) throw new IOException("pobieranie przerwane");
         } finally {
             c.disconnect();
         }
